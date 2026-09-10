@@ -35,3 +35,6 @@ target/
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Local uploads
+uploads/
