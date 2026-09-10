@@ -1,0 +1,87 @@
+Implementation Plan - WeBox Tier 1 & Tier 2 Feature Completion
+This plan outlines the complete implementation for missing PRD Tier 1 (Core) and Tier 2 (Advanced) requirements, providing a full-stack, enterprise-grade, English-only meal ordering platform for employees and administrators.
+
+User Review Required
+IMPORTANT
+
+Data Consistency & Seed Update: We will preserve existing seeded admin account (admin@webox.com / Admin123) and menu items, and enrich custom options for demo dishes (e.g. burgers, pastas, salads).
+Authentication Flow: Replace temporary browser prompt() with a full responsive Auth Modal with persistent sessions (LocalStorage + GET /api/me), role-based routing (Console view for Admins, Employee view for Employees), and clear error messages.
+Console Management Architecture: Implement a single-page view switcher in the SPA so administrators can seamlessly toggle between the Employee Menu view and the Console Management dashboard without needing an external routing framework.
+Proposed Changes
+Backend Components
+[MODIFY] 
+Repositories.java
+Add query methods for checking active orders for a user on a given date and slot.
+Add repository helper methods for DailyMenu management by date and dish id.
+[MODIFY] 
+Api.java
+User Session & Preferences:
+GET /api/me: Returns current user info (email, role, allergens, preferredCategories, spice, budgetMin, budgetMax).
+PUT /api/me/preferences: Updates employee's allergens, preferred categories, spice level, and budget bounds.
+Ordering Enhancements:
+GET /api/orders/check: Checks if an active order (Pending or Confirmed) already exists for current user for target date + slot.
+Enrich order placement logic to ensure full option snapshotting.
+Admin Console APIs (Secured with role check: ADMIN only):
+GET /api/admin/dishes: List all dishes (both active and inactive).
+POST /api/admin/dishes: Create new dish with full metadata (name, description, price, category, protein, spice, allergens, image, optionsJson).
+PUT /api/admin/dishes/{id}: Update existing dish details.
+PATCH /api/admin/dishes/{id}/status: Toggle active / inactive status.
+GET /api/admin/menu?date=YYYY-MM-DD: Get menu schedules and stock for a specified date.
+POST /api/admin/menu: Schedule daily menu items and supply stock count for a specified date.
+Frontend Components
+[MODIFY] 
+index.html
+Add Auth Modal (Sign In / Register) with field validation, toggle tab, and error feedback.
+Add Dish Details & Customization Modal with allergen badges, nutrition facts, radio/checkbox option selectors, and dynamic total price preview.
+Add Allergen Warning Dialog for cart additions.
+Add Preferences Modal for allergen tags, cuisine preferences, spice preference, and meal budget range.
+Add Multi-Select Category Filters bar.
+Add Date & Slot selector in Bag drawer with auto-cutoff countdown & display.
+Add Order Confirmation Modal with delivery details.
+Add Order History Drawer with live order status badges and Cancel button.
+Add Admin Console Dashboard view (Dish Table, Add/Edit Dish Modal, Daily Menu Schedule Modal).
+[MODIFY] 
+app.js
+State Management & Auth:
+Store token, user profile, preferences, active view (menu vs console), multi-selected categories, and cart.
+Automatic me() sync on load; role-based UI switching.
+Dish Details & Customization:
+Clicking cards opens customizer with options calculation.
+Allergen check against employee preferences before adding to cart.
+Debounced cart buttons.
+Ordering & Cutoff Times:
+Automatic slot determination (10:00 Lunch cutoff, 15:00 Dinner cutoff).
+Pre-order check to switch button to View Existing Order if already ordered for target slot.
+Budget overflow alert if total exceeds employee's budgetMax.
+My Orders:
+Fetch and render user order history with cancellation support for Pending orders.
+Admin Console Logic:
+Dish listing, search, category filter, toggle status, create/edit dish, and assign daily menu stock.
+[MODIFY] 
+styles.css
+Implement styles for Modals (backdrop blur, dialog card, animations).
+Implement Console table, badges, action buttons, and form controls.
+Responsive styles for both mobile and desktop screens.
+Verification Plan
+Automated Tests
+Run docker exec demo1-app-1 mvn test to ensure existing and new backend unit tests pass.
+Manual Verification
+Auth & Roles:
+Register a new employee account; verify validation rules (8+ chars with letters & numbers, unique email).
+Log in with admin@webox.com / Admin123; verify Console navigation button appears.
+Menu, Details & Customization:
+Click dishes (e.g. Classic Beef Burger / Caesar Salad); customize options and check price calculation.
+Add to bag and verify individual customized line items in cart.
+Test multi-category selection (e.g. Chinese + Japanese simultaneously).
+Preferences & Allergen Warning:
+Mark Egg as an allergen in Preferences; attempt to add Caesar Salad; verify warning dialog appears and can proceed or cancel.
+Set meal budget; verify badge/warning when order total exceeds budget.
+Toggle For you; verify preferred dishes are sorted first and highlighted.
+Ordering & Cutoff Rules:
+Verify cutoff time and slot switching logic.
+Place an order; verify order success dialog.
+Verify that trying to order again for the same slot switches button to View Existing Order.
+Open My Orders; verify the order appears and can be cancelled while Pending.
+Admin Console:
+Switch to Console as admin; create a new dish; edit its details; toggle active/inactive.
+Set daily menu stock; switch back to employee view and verify visibility and stock update.
