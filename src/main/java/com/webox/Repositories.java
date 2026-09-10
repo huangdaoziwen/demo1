@@ -9,4 +9,10 @@ interface MenuRepository extends JpaRepository<Domain.DailyMenu,Long>{
  Optional<Domain.DailyMenu> findByMenuDateAndDishId(LocalDate date,Long dishId);
  @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select m from DailyMenu m where m.menuDate=:date and m.dish.id=:dish") Optional<Domain.DailyMenu> lock(@Param("date") LocalDate date,@Param("dish") Long dish);
 }
-interface OrderRepository extends JpaRepository<Domain.MealOrder,String>{Optional<Domain.MealOrder> findByUserIdAndIdempotencyKey(Long user,String key);List<Domain.MealOrder> findByUserIdOrderByCreatedAtDesc(Long user);Optional<Domain.MealOrder> findByUserIdAndMealDateAndSlotAndActiveKey(Long u,LocalDate d,String s,String a);}
+interface OrderRepository extends JpaRepository<Domain.MealOrder,String>{
+ Optional<Domain.MealOrder> findByUserIdAndIdempotencyKey(Long user,String key);
+ List<Domain.MealOrder> findByUserIdOrderByCreatedAtDesc(Long user);
+ Optional<Domain.MealOrder> findByUserIdAndMealDateAndSlotAndActiveKey(Long u,LocalDate d,String s,String a);
+ List<Domain.MealOrder> findByMealDateBetween(LocalDate from,LocalDate to);
+ List<Domain.MealOrder> findByUserIdAndMealDateGreaterThanEqual(Long user,LocalDate from);
+}

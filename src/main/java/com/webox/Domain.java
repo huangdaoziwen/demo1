@@ -12,7 +12,7 @@ class Domain {
   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id; @Column(nullable=false,length=200) public String email;
   @JsonIgnore @Column(nullable=false) public String passwordHash; @Column(nullable=false) public String role="EMPLOYEE"; @JsonIgnore public String token;
   @ElementCollection(fetch=FetchType.EAGER) public Set<String> allergens=new HashSet<>(); @ElementCollection(fetch=FetchType.EAGER) public Set<String> preferredCategories=new HashSet<>();
-  public String spice="None"; public Integer budgetMin=1500,budgetMax=4000;
+  public String spice="None"; public String tasteIntensity="Regular"; public Integer budgetMin=1500,budgetMax=4000;
  }
  @Entity(name="Dish") @JsonAutoDetect(fieldVisibility=JsonAutoDetect.Visibility.ANY) static class Dish {
   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id; @Column(nullable=false,length=100) public String name;

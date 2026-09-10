@@ -6,8 +6,9 @@ WeBox is a responsive employee meal-ordering platform with a Spring Boot API, tr
 
 - **Java 17 + Spring Boot 3 / JPA:** conventional, maintainable service boundaries and database transactions.
 - **MySQL 8.4:** independently deployed durable storage. Money uses `DECIMAL`/`BigDecimal`, never floating point on the server.
-- **Dependency-free SPA:** fast first load and a small operational surface. Responsive CSS supports desktop and phone screens.
+- **Dependency-free SPA:** fast first load and a small operational surface. Responsive CSS supports desktop and phone screens, incremental menu rendering, and throttled cart actions.
 - **Pessimistic inventory locks + idempotency keys:** serializes stock changes and makes retried submissions safe.
+- **SSE + Caffeine:** pushes stock changes to every open menu and absorbs repeated reads of the date-scoped menu, with invalidation after every stock or catalogue mutation.
 
 ## Run locally
 
@@ -51,12 +52,16 @@ All request/response bodies are JSON. Authenticated routes use `Authorization: B
 | POST | `/api/orders` | Idempotently place an order; requires `idempotencyKey`, `date`, `slot`, `address`, and `items` |
 | GET | `/api/orders` | Current employee's order history |
 | POST | `/api/orders/{id}/cancel` | Cancel a pending owned order and restore inventory |
+| GET | `/api/inventory/stream` | SSE stream of `stock_update` events |
+| POST | `/api/assistant/recommend` | Stream safe recommendations filtered by preferences, inventory, allergens, and seven-day history |
+| GET | `/api/admin/metrics` | Admin-only dashboard aggregates for today and the last seven days |
+| POST | `/api/admin/uploads` | Admin-only image upload (`multipart/form-data`, 5 MB maximum) |
 
 Example order item: `{"dishId":1,"quantity":2,"selections":"Whole Wheat · Mustard","optionPrice":0}`. Errors use an HTTP status appropriate to the failure and an English `message` field.
 
 ## Security and operations
 
-Passwords are BCrypt hashes. Inputs are constrained and validated; JPA parameter binding prevents SQL injection. Inventory locking prevents overselling, an order idempotency key handles client retries, and role fields establish the authorization boundary for future Console endpoints. In production, terminate TLS at the ingress, place tokens in secure HTTP-only cookies, rotate secrets, add database migrations and metrics, and move image assets to managed object storage.
+Passwords are BCrypt hashes. Inputs are constrained and validated; JPA parameter binding prevents SQL injection. Inventory locking prevents overselling, an order idempotency key handles client retries, and admin routes enforce role authorization. Uploaded images are stored in `UPLOAD_DIR` (default `./uploads`); production deployments should mount durable storage or replace it with object storage. In production, terminate TLS at the ingress, place tokens in secure HTTP-only cookies, rotate secrets, and add database migrations and operational metrics.
 
 ## AI conversation record
 
