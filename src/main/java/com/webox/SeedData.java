@@ -15,6 +15,8 @@ import java.math.BigDecimal; import java.time.LocalDate; import java.util.*;
   add(dishes,menus,"Chicken Quinoa Bowl","Low-fat high-protein grilled chicken with quinoa, avocado and vegetables","35.80","Light Meal","Chicken","None",Set.of(),"https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80","[]",14);
   add(dishes,menus,"Korean Bibimbap","Stone-pot mixed rice with vegetables, fried egg and chili sauce","30.00","Korean","Egg","Mild",Set.of("Egg","Soy"),"https://images.unsplash.com/photo-1553163147-622ab57be1c7?auto=format&fit=crop&w=900&q=80",optionsFor("Korean Bibimbap"),10);
   add(dishes,menus,"Classic Beef Burger","Angus beef patty with lettuce, tomato and onion","38.00","Western","Beef","None",Set.of("Gluten","Dairy"),"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=80",optionsFor("Classic Beef Burger"),9);
+  add(dishes,menus,"Tom Yum Soup","Thai hot & sour shrimp soup with lemongrass, galangal and lime leaves","32.00","Southeast Asian","Shrimp","Hot",Set.of("Shellfish"),"https://images.unsplash.com/photo-1548943487-a2e4e43b4853?auto=format&fit=crop&w=900&q=80","[]",11);
+  add(dishes,menus,"Mapo Tofu","Sichuan classic with soft tofu and spicy minced meat","18.00","Chinese","Tofu, Pork","Medium",Set.of("Soy"),"https://images.unsplash.com/photo-1582450871972-ab5ca641643d?auto=format&fit=crop&w=900&q=80","[]",15);
  };}
  static String optionsFor(String name){return switch(name){
   case "Tomato Pasta"->"[{\"name\":\"Pasta\",\"required\":true,\"choices\":[[\"Spaghetti\",0],[\"Penne\",0]]},{\"name\":\"Add-ons\",\"required\":false,\"choices\":[[\"Extra Parmesan\",3],[\"Grilled Chicken\",6]]}]";
