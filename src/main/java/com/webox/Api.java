@@ -27,8 +27,11 @@ class Api {
  private final OrderRepository orders;
  private final InventoryEvents inventoryEvents;
  private final StorageConfig storage;
+ private final AiService aiService;
  private final BCryptPasswordEncoder bcrypt=new BCryptPasswordEncoder();
- Api(UserRepository u,DishRepository d,MenuRepository m,OrderRepository o,InventoryEvents events,StorageConfig storage){users=u;dishes=d;menus=m;orders=o;inventoryEvents=events;this.storage=storage;}
+ Api(UserRepository u,DishRepository d,MenuRepository m,OrderRepository o,InventoryEvents events,StorageConfig storage,AiService ai){
+  users=u;dishes=d;menus=m;orders=o;inventoryEvents=events;this.storage=storage;aiService=ai;
+ }
 
  record Credentials(@NotBlank @Email @Size(max=200) String email,
                     @NotBlank @Pattern(regexp="^(?=.*[A-Za-z])(?=.*\\d).{8,72}$",message="Password must contain letters and numbers and be at least 8 characters") String password){}
@@ -158,13 +161,23 @@ class Api {
  @PostMapping(path="/assistant/recommend",produces=MediaType.TEXT_EVENT_STREAM_VALUE)
  SseEmitter recommend(@RequestHeader("Authorization") String auth,@Valid @RequestBody AssistantRequest request){
   var u=me(auth);var emitter=new SseEmitter(60_000L);CompletableFuture.runAsync(()->{
-   try{var today=LocalDate.now();var recent=orders.findByUserIdAndMealDateGreaterThanEqual(u.id,today.minusDays(7)).stream().flatMap(o->o.items.stream()).map(i->i.dish.id).collect(java.util.stream.Collectors.toSet());var words=request.message().toLowerCase(Locale.ROOT);
-    var candidates=menus.findByMenuDateAndDishActiveTrue(today).stream().filter(m->m.stock>0&&!recent.contains(m.dish.id)&&Collections.disjoint(m.dish.allergens,u.allergens)).sorted(Comparator.<Domain.DailyMenu>comparingInt(m->assistantScore(m.dish,u,words)).reversed()).limit(3).toList();
-    emitter.send(SseEmitter.event().name("intro").data("I considered your preferences, allergies, live stock, and meals from the last 7 days."));
-    for(var m:candidates){var reason=assistantReason(m.dish,u,words);emitter.send(SseEmitter.event().name("recommendation").data(new Recommendation(m.dish.id,reason)));Thread.sleep(220);}
-    if(candidates.isEmpty())emitter.send(SseEmitter.event().name("intro").data("No safe, in-stock dishes remain after applying your allergy and 7-day history rules."));emitter.send(SseEmitter.event().name("done").data("done"));emitter.complete();
-   }catch(Exception e){emitter.completeWithError(e);}});return emitter;
+   try{
+    var today=LocalDate.now();
+    var recent=orders.findByUserIdAndMealDateGreaterThanEqual(u.id,today.minusDays(7)).stream().flatMap(o->o.items.stream()).map(i->i.dish.id).collect(java.util.stream.Collectors.toSet());
+    var candidateMenus=menus.findByMenuDateAndDishActiveTrue(today).stream()
+            .filter(m->m.stock>0&&!recent.contains(m.dish.id)&&Collections.disjoint(m.dish.allergens,u.allergens))
+            .toList();
+    var candidateDishes=candidateMenus.stream().map(m->m.dish).toList();
+    emitter.send(SseEmitter.event().name("intro").data("Analyzing your request against live menu, allergies, and past orders..."));
+    var recs=aiService.recommend(u,candidateDishes,request.message());
+    for(var r:recs){
+     emitter.send(SseEmitter.event().name("recommendation").data(new Recommendation(r.dishId(),r.reason())));
+     Thread.sleep(180);
+    }
+    if(recs.isEmpty())emitter.send(SseEmitter.event().name("intro").data("No safe, in-stock dishes remain after applying your allergy and 7-day history rules."));
+    emitter.send(SseEmitter.event().name("done").data("done"));
+    emitter.complete();
+   }catch(Exception e){emitter.completeWithError(e);}});
+  return emitter;
  }
- private int assistantScore(Domain.Dish d,Domain.User u,String words){int score=u.preferredCategories.contains(d.category)?4:0;score+=u.spice.equals(d.spice)?2:0;String text=(d.name+" "+d.description+" "+d.category+" "+d.protein).toLowerCase(Locale.ROOT);for(var word:words.split("\\W+"))if(word.length()>2&&text.contains(word))score+=3;if((words.contains("light")||words.contains("low-fat"))&&"Light Meal".equals(d.category))score+=6;if((words.contains("protein")||words.contains("high-protein"))&&!"None".equals(d.protein))score+=5;return score;}
- private String assistantReason(Domain.Dish d,Domain.User u,String words){var reasons=new ArrayList<String>();if(u.preferredCategories.contains(d.category))reasons.add("matches your "+d.category+" preference");if(u.spice.equals(d.spice))reasons.add("fits your "+d.spice.toLowerCase(Locale.ROOT)+" spice setting");if(words.contains("protein")&&!"None".equals(d.protein))reasons.add("offers "+d.protein.toLowerCase(Locale.ROOT)+" protein");if("Light".equals(u.tasteIntensity)||words.contains("light"))reasons.add("suits a lighter meal");return "Recommended because it "+(reasons.isEmpty()?"best matches your request":String.join(" and ",reasons))+".";}
 }
