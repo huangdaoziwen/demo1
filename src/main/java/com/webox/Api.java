@@ -78,7 +78,7 @@ class Api {
  }
  private MenuDish menuDto(Domain.DailyMenu m){var d=m.dish;return new MenuDish(d.id,d.name,d.description,d.price,d.category,d.protein,d.spice,Set.copyOf(d.allergens),d.image,d.optionsJson,m.stock);}
 
- record Item(@NotNull Long dishId,@Min(1) @Max(5) int quantity,@Size(max=1000) String selections,@DecimalMin("0") BigDecimal optionPrice){}
+ record Item(@NotNull Long dishId,@Min(1) @Max(5) int quantity,@Size(max=20) List<@Valid OrderRules.OptionSelection> options){}
  record Place(@NotBlank @Size(max=80) String idempotencyKey,LocalDate date,@NotNull @Pattern(regexp="Lunch|Dinner") String slot,@NotBlank @Size(max=200) String address,@NotEmpty List<@Valid Item> items){}
  record OrderItemDto(Long id,Long dishId,String dishName,String image,int quantity,BigDecimal unitPrice,BigDecimal subtotal,String selections){}
  record OrderDto(String id,LocalDate mealDate,String slot,String status,String address,BigDecimal total,Instant createdAt,List<OrderItemDto> items){}
@@ -90,17 +90,17 @@ class Api {
  @CacheEvict(value="menus",allEntries=true) @PostMapping("/orders") @Transactional OrderDto place(@RequestHeader("Authorization") String auth,@Valid @RequestBody Place p){
   var u=me(auth);var old=orders.findByUserIdAndIdempotencyKey(u.id,p.idempotencyKey());if(old.isPresent())return orderDto(old.get());
   int count=p.items().stream().mapToInt(Item::quantity).sum();if(count>5)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"An order can contain at most 5 meals");
-  var target=nextSlot(p.date(),p.slot());if(orders.findByUserIdAndMealDateAndSlotAndActiveKey(u.id,target.date,target.slot,"ACTIVE").isPresent())throw new ResponseStatusException(HttpStatus.CONFLICT,"You already have an active order for this meal");
-  var o=new Domain.MealOrder();o.id="WB-"+UUID.randomUUID().toString().substring(0,8).toUpperCase();o.user=u;o.mealDate=target.date;o.slot=target.slot;o.address=p.address();o.status="Pending";o.createdAt=Instant.now();o.idempotencyKey=p.idempotencyKey();o.total=BigDecimal.ZERO;
-  for(var in:p.items()){
-   var menu=menus.lock(target.date,in.dishId()).orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"A selected dish is unavailable"));
+  var target=nextSlot(p.date(),p.slot());if(orders.findByUserIdAndMealDateAndSlotAndActiveKey(u.id,target.date(),target.slot(),"ACTIVE").isPresent())throw new ResponseStatusException(HttpStatus.CONFLICT,"You already have an active order for this meal");
+  var o=new Domain.MealOrder();o.id="WB-"+UUID.randomUUID().toString().substring(0,8).toUpperCase();o.user=u;o.mealDate=target.date();o.slot=target.slot();o.address=p.address();o.status="Pending";o.createdAt=Instant.now();o.idempotencyKey=p.idempotencyKey();o.total=BigDecimal.ZERO;
+  for(var in:OrderRules.lockOrder(p.items())){
+   var menu=menus.lock(target.date(),in.dishId()).orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"A selected dish is unavailable"));
    if(menu.stock<in.quantity())throw new ResponseStatusException(HttpStatus.CONFLICT,menu.dish.name+" has only "+menu.stock+" remaining");menu.stock-=in.quantity();
-   var i=new Domain.OrderItem();i.order=o;i.dish=menu.dish;i.quantity=in.quantity();i.selections=in.selections()==null?"":in.selections();i.unitPrice=menu.dish.price.add(in.optionPrice()==null?BigDecimal.ZERO:in.optionPrice());i.subtotal=i.unitPrice.multiply(BigDecimal.valueOf(i.quantity));o.total=o.total.add(i.subtotal);o.items.add(i);
+   var priced=OrderRules.priceOptions(menu.dish.optionsJson,in.options());
+   var i=new Domain.OrderItem();i.order=o;i.dish=menu.dish;i.quantity=in.quantity();i.selections=priced.description();i.unitPrice=menu.dish.price.add(priced.price());i.subtotal=i.unitPrice.multiply(BigDecimal.valueOf(i.quantity));o.total=o.total.add(i.subtotal);o.items.add(i);
   }
   var saved=orders.save(o);o.items.forEach(i->menus.findByMenuDateAndDishId(o.mealDate,i.dish.id).ifPresent(m->inventoryEvents.publish(o.mealDate,i.dish.id,m.stock)));return orderDto(saved);
  }
- record Slot(LocalDate date,String slot){}
- private Slot nextSlot(LocalDate d,String s){var now=LocalDateTime.now();var date=d==null?now.toLocalDate():d;if(date.isAfter(now.toLocalDate()))return new Slot(date,s);if("Lunch".equals(s)&&now.toLocalTime().isBefore(LocalTime.of(10,0)))return new Slot(date,s);if(now.toLocalTime().isBefore(LocalTime.of(15,0)))return new Slot(date,"Dinner");return new Slot(date.plusDays(1),"Lunch");}
+ private OrderRules.Slot nextSlot(LocalDate d,String s){return OrderRules.nextSlot(LocalDateTime.now(ZoneId.of(OrderRules.BUSINESS_TIME_ZONE)),d,s);}
  @GetMapping("/orders") List<OrderDto> listOrders(@RequestHeader("Authorization") String auth){return orders.findByUserIdOrderByCreatedAtDesc(me(auth).id).stream().map(this::orderDto).toList();}
  @CacheEvict(value="menus",allEntries=true) @PostMapping("/orders/{id}/cancel") @Transactional OrderDto cancel(@RequestHeader("Authorization") String auth,@PathVariable String id){
   var u=me(auth);var o=orders.findById(id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Order not found"));if(!o.user.id.equals(u.id))throw new ResponseStatusException(HttpStatus.FORBIDDEN);
