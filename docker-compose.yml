@@ -21,6 +21,9 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/webox?createDatabaseIfNotExist=true&serverTimezone=UTC
       DB_USER: webox
       DB_PASSWORD: webox
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
     command: mvn spring-boot:run
     depends_on:
       mysql:
