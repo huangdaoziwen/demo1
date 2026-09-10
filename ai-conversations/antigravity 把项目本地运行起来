@@ -1,0 +1,23 @@
+用户指令：把项目运行起来
+
+agent 回复：
+
+访问地址与测试信息
+Web 访问地址：http://localhost:8080
+预置管理员账号：
+Email：admin@webox.com
+Password：Admin123
+普通用户：可在前端界面的下单结算处直接注册与登录。
+🛠️ 处理与修复的问题
+环境一键化配置：
+宿主机缺少独立的 JDK 17 及 Maven 环境，已在 
+docker-compose.yml
+ 中配置完整的 app 服务（基于官方 maven:3.9-eclipse-temurin-17），挂载本地工作目录和 ~/.m2 缓存，实现与 MySQL（8.4）一键协同拉起。
+修复 JPA 实体 SQM 解析错误：
+修复了 
+Domain.java
+ 中内部静态类的实体命名映射（添加显式 @Entity(name = "...")），解决了 Hibernate 6 启动时无法解析 DailyMenu 导致报错退出的问题。
+修复接口懒加载序列化异常：
+为 ElementCollection 及关联集合配置了 FetchType.EAGER / @Transactional(readOnly = true)，避免了 GET /api/menu 等接口序列化时的 LazyInitializationException。
+自动化测试验证：
+执行并通过了所有自动化测试用例（mvn test）。
